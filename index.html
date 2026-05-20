@@ -335,7 +335,7 @@ async function fetchGmail(maxResults = 10, query = 'in:inbox newer_than:7d') {
     const data = await r.json();
     if (!data.messages) return [];
     const details = await Promise.all(data.messages.slice(0,8).map(async m => {
-      const d = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`, {
+      const d = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`, {
         headers: { Authorization: 'Bearer ' + state.googleToken }
       });
       return d.json();
@@ -343,9 +343,29 @@ async function fetchGmail(maxResults = 10, query = 'in:inbox newer_than:7d') {
     return details.map(m => {
       const h = m.payload?.headers || [];
       const get = name => h.find(x=>x.name===name)?.value || '';
-      return { id: m.id, subject: get('Subject'), from: get('From'), date: get('Date'), snippet: m.snippet };
+      const body = extractBody(m.payload);
+      return { id: m.id, subject: get('Subject'), from: get('From'), date: get('Date'), snippet: m.snippet, body: body };
     });
   } catch(e) { return null; }
+}
+
+function extractBody(payload) {
+  if (!payload) return '';
+  if (payload.body?.data) {
+    try { return atob(payload.body.data.replace(/-/g,'+').replace(/_/g,'/')); } catch(e) { return ''; }
+  }
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/plain' && part.body?.data) {
+        try { return atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/')); } catch(e) {}
+      }
+    }
+    for (const part of payload.parts) {
+      const nested = extractBody(part);
+      if (nested) return nested;
+    }
+  }
+  return '';
 }
 
 async function fetchCalendar(days = 7) {
@@ -450,7 +470,7 @@ async function quickAction(type) {
     const all = [...(inbox||[]), ...(booking||[]), ...(megaub||[]), ...(hauzi||[])];
     const unique = all.filter((e,i,a) => a.findIndex(x=>x.id===e.id)===i);
     if (!unique.length) { addBubble('agent','Žiadne emaily nenájdené alebo token expiroval – skúste prepojiť Google znova.', agent); return; }
-    const summary = unique.map(e=>`Od: ${e.from}\nPredmet: ${e.subject}\nDátum: ${e.date}\nNáhľad: ${e.snippet}`).join('\n\n---\n\n');
+    const summary = unique.map(e=>`Od: ${e.from}\nPredmet: ${e.subject}\nDátum: ${e.date}\nObsah: ${e.body ? e.body.substring(0,1500) : e.snippet}`).join('\n\n---\n\n');
     const prompt = `Toto sú moje emaily (inbox za 7 dní + všetky z booking.com, megaubytovanie.sk, hauzi.sk):\n\n${summary}\n\nPrezri ich dôkladne. Hľadaj: 1) dopyty na ubytovanie v Panorama Home (dátumy, počet osôb) 2) správy od hostí (otázky, potvrdenia) 3) iné dôležité správy. Pre každý dopyt na ubytovanie okamžite spusť workflow - vypočítaj cenu a priprav email.`;
     await sendWithContext(prompt, agent);
   } else if (type==='calendar') {

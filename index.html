@@ -267,7 +267,7 @@ Keď si vypočítala cenu a chceš skontrolovať kalendár, pridaj SEND_TO pre M
   },
   {
     id: 'juraj', name: 'Juraj', role: 'Účtovník', initials: 'JU', color: 'color-amber',
-    quickActions: ['Priprav faktúru', 'Zoznam faktúr', 'Kontrola platieb'],
+    quickActions: ['Priprav faktúru + PDF', 'Zoznam faktúr', 'Kontrola platieb'],
     system: `Si Juraj, účtovník firmy TRIMEX DOMY, s.r.o. Komunikuješ VÝHRADNE po slovensky. Si presný a spoľahlivý. Nikdy nehovor že si AI. Nikdy nepoužívaj emoji.
 
 DODÁVATEĽ: TRIMEX DOMY, s.r.o., Benkova 1263/2, 91501 Nové Mesto nad Váhom
@@ -720,6 +720,55 @@ function sendToAgent(fromAgentId, toAgentId, message) {
   fetchAgentReply(toAgentId, wrappedMsg);
 }
 
+function extractFakturaFromText(text, history) {
+  // Extract key data from Juraj's text response
+  const cisloM = text.match(/260(\d{3})/);
+  const celkomM = text.match(/(?:celkom|spolu|uhradiť)[:\s*]*([\d,\.]+)\s*€/i) || text.match(/([\d,\.]+)\s*€.*?(?:celkom|spolu)/i);
+  const zalohaM = text.match(/záloha[^\d]*(\d+[\.,]?\d*)\s*€/i);
+  const zalohaDatM = text.match(/záloha[^\d]*\d+[\.,]?\d*\s*€[^\d]*([\d]{1,2}\.[\d]{1,2}\.[\d]{4})/i);
+  const menoM = text.match(/(?:meno|odberateľ)[:\s]+([A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽ][a-záäčďéíľňóôŕšťúýž]+ [A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽ][a-záäčďéíľňóôŕšťúýž]+)/i);
+  const datumyM = text.match(/(\d{1,2}\.\d{1,2}\.\d{4})[\s–-]+(\d{1,2}\.\d{1,2}\.\d{4})/);
+  const osobyM = text.match(/(\d+)\s*osôb/i);
+  const danM = text.match(/daň[^\d]*(\d+[\.,]?\d*)\s*€/i);
+  const saunaM = text.match(/sauna[^\d]*(\d+)\s*€/i);
+
+  // Search in full history for address
+  const allText = history.map(m=>m.content).join(' ');
+  const adresaM = allText.match(/([A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽ][a-záäčďéíľňóôŕšťúýž]+\s+\d+),?\s+([A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽ][a-záäčďéíľňóôŕšťúýž]+)/);
+
+  const celkom = celkomM ? parseFloat(celkomM[1].replace(',','.')) : 0;
+  const zaloha = zalohaM ? parseFloat(zalohaM[1].replace(',','.')) : celkom * 0.5;
+  const dan = danM ? parseFloat(danM[1].replace(',','.')) : 0;
+  const sauna = saunaM ? parseFloat(saunaM[1]) : 0;
+  const osoby = osobyM ? parseInt(osobyM[1]) : 0;
+
+  if (!celkom) return null;
+
+  const dnes = new Date();
+  const datum = dnes.getDate()+'.'+(dnes.getMonth()+1)+'.'+dnes.getFullYear();
+
+  return {
+    cislo: cisloM ? '260'+cisloM[1] : '260001',
+    datum: datum,
+    splatnost: datumyM ? datumyM[1] : datum,
+    odberatel: {
+      meno: menoM ? menoM[1] : '',
+      adresa: adresaM ? adresaM[1] : '',
+      mesto: adresaM ? adresaM[2] : '',
+      ico: '', dic: ''
+    },
+    pobyt: {
+      popis: datumyM ? `ubytovanie v Panorama home Valčianska dolina, ${osoby} osôb, ${datumyM[1]}–${datumyM[2]}` : 'ubytovanie v Panorama home Valčianska dolina',
+      suma: celkom - dan - sauna
+    },
+    dan: { pocet: osoby * 2, suma: dan },
+    sauna: sauna,
+    celkom: celkom,
+    zaloha: zaloha,
+    zaloha_datum: zalohaDatM ? zalohaDatM[1] : datum
+  };
+}
+
 function generatePDF(data) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
@@ -975,14 +1024,22 @@ async function sendWithContext(userText, agent) {
     const reply = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
     if (reply) {
       const hasHandoff = checkForAgentHandoff(reply, agent.id);
-      const fakturaData = agent.id === 'juraj' ? tryParseFakturaJSON(reply) : null;
+      let fakturaData = agent.id === 'juraj' ? tryParseFakturaJSON(reply) : null;
       const cleanReply = reply
         .replace(/SEND_TO:\{[^\n]+\}/g, '')
-        .replace(/FAKTURA_JSON:\{[\s\S]*?\}(?=\s|$)/, '')
+        .replace(/FAKTURA_JSON:[\s\S]*$/m, '')
+        .replace(/```[\s\S]*?```/g, '')
         .trim();
       if (cleanReply) {
         addBubble('agent', cleanReply, agent);
         state.histories[agent.id].push({role:'assistant', content:cleanReply});
+      }
+      // If Juraj mentioned faktúra but no JSON found, show manual PDF button
+      if (agent.id === 'juraj' && !fakturaData) {
+        const hasFakturaText = /faktúr|260\d{3}|celkom|záloha/i.test(cleanReply);
+        if (hasFakturaText) {
+          fakturaData = extractFakturaFromText(cleanReply, state.histories['juraj']);
+        }
       }
       if (fakturaData) {
         addPDFButton(fakturaData);

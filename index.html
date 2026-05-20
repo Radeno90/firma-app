@@ -542,8 +542,22 @@ function backToBoard() { showScreen('boardroom'); }
 function showScreen(name) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById('screen-'+name).classList.add('active'); }
 
 function openSettings() {
-  const newKey = prompt('Anthropic API kľúč:', state.apiKey);
-  if (newKey!==null) { state.apiKey=newKey; localStorage.setItem('firma_key',newKey); }
+  const choice = prompt('Nastavenia:\n1 - Zmeniť API kľúč\n2 - Odpojiť Google\n3 - Odhlásiť sa (reset)\n\nZadaj číslo:');
+  if (choice==='1') {
+    const newKey = prompt('Anthropic API kľúč:', state.apiKey);
+    if (newKey!==null) { state.apiKey=newKey; localStorage.setItem('firma_key',newKey); alert('API kľúč uložený.'); }
+  } else if (choice==='2') {
+    state.googleToken=null;
+    localStorage.removeItem('firma_gtoken');
+    if(window.google) google.accounts.oauth2.revoke(state.googleToken, ()=>{});
+    updateGoogleUI(false);
+    alert('Google odpojený.');
+  } else if (choice==='3') {
+    if (confirm('Naozaj sa chcete odhlásiť? Všetky konverzácie sa vymažú.')) {
+      localStorage.clear();
+      location.reload();
+    }
+  }
 }
 
 window.addEventListener('load', () => {

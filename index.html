@@ -326,7 +326,7 @@ function updateGoogleUI(connected) {
   }
 }
 
-async function fetchGmail(maxResults = 10, query = 'in:inbox newer_than:2d') {
+async function fetchGmail(maxResults = 10, query = 'in:inbox newer_than:7d') {
   if (!state.googleToken) return null;
   try {
     const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=${encodeURIComponent(query)}`, {
@@ -441,16 +441,17 @@ async function quickAction(type) {
   }
   if (type==='email') {
     addSystemMsg('Načítavam emaily...');
-    const [inbox, booking, megaub] = await Promise.all([
+    const [inbox, booking, megaub, hauzi] = await Promise.all([
       fetchGmail(8, 'in:inbox newer_than:7d'),
-      fetchGmail(5, 'in:inbox from:booking.com'),
-      fetchGmail(5, 'in:inbox from:megaubytovanie')
+      fetchGmail(8, 'from:booking.com'),
+      fetchGmail(8, 'from:megaubytovanie.sk'),
+      fetchGmail(8, 'from:hauzi.sk')
     ]);
-    const all = [...(inbox||[]), ...(booking||[]), ...(megaub||[])];
+    const all = [...(inbox||[]), ...(booking||[]), ...(megaub||[]), ...(hauzi||[])];
     const unique = all.filter((e,i,a) => a.findIndex(x=>x.id===e.id)===i);
     if (!unique.length) { addBubble('agent','Žiadne emaily nenájdené alebo token expiroval – skúste prepojiť Google znova.', agent); return; }
     const summary = unique.map(e=>`Od: ${e.from}\nPredmet: ${e.subject}\nDátum: ${e.date}\nNáhľad: ${e.snippet}`).join('\n\n---\n\n');
-    const prompt = `Toto sú moje emaily (inbox za 7 dní + všetky z booking.com a megaubytovanie):\n\n${summary}\n\nPrezri ich a identifikuj či sú tam dopyty na ubytovanie v Panorama Home alebo iné dôležité správy. Ak nájdeš dopyt na ubytovanie, spusť workflow.`;
+    const prompt = `Toto sú moje emaily (inbox za 7 dní + všetky z booking.com, megaubytovanie.sk, hauzi.sk):\n\n${summary}\n\nPrezri ich dôkladne. Hľadaj: 1) dopyty na ubytovanie v Panorama Home (dátumy, počet osôb) 2) správy od hostí (otázky, potvrdenia) 3) iné dôležité správy. Pre každý dopyt na ubytovanie okamžite spusť workflow - vypočítaj cenu a priprav email.`;
     await sendWithContext(prompt, agent);
   } else if (type==='calendar') {
     addSystemMsg('Načítavam kalendár...');

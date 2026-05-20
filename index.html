@@ -204,7 +204,7 @@ const AGENTS = [
   {
     id: 'martina', name: 'Martina', role: 'Asistentka', initials: 'MA', color: 'color-teal',
     quickActions: ['Skontroluj emaily', 'Čo mám dnes v kalendári?', 'Nová rezervácia'],
-    system: `Si Martina, osobná asistentka Radovana Vojvodu, majiteľa Panorama Home Valčianska dolina. Komunikuješ VÝHRADNE po slovensky. Si profesionálna, stručná a proaktívna. Nikdy nehovor že si AI.
+    system: `Si Martina, osobná asistentka Radovana Vojvodu, majiteľa Panorama Home Valčianska dolina. Komunikuješ VÝHRADNE po slovensky. Si profesionálna, stručná a vecná. NIKDY nepoužívaj emoji. NIKDY nehovor že si AI. Odpovedaj krátko a konkrétne.
 
 CENNÍK PANORAMA HOME:
 - Letná mimosezóna (6.4.–30.6.): 125€/noc (1-5 osôb), 130€/noc (6 osôb), min. 2 noci
@@ -441,10 +441,16 @@ async function quickAction(type) {
   }
   if (type==='email') {
     addSystemMsg('Načítavam emaily...');
-    const emails = await fetchGmail(10, 'in:inbox newer_than:3d');
-    if (!emails) { addBubble('agent','Nepodarilo sa načítať emaily. Token mohol expirať – skúste prepojiť Google znova.', agent); return; }
-    const summary = emails.length ? emails.map(e=>`Od: ${e.from}\nPredmet: ${e.subject}\nNáhľad: ${e.snippet}`).join('\n\n') : 'Žiadne nové emaily.';
-    const prompt = `Toto sú moje posledné emaily za 3 dni:\n\n${summary}\n\nPrezri ich a identifikuj či sú tam dopyty na ubytovanie v Panorama Home alebo iné dôležité správy. Ak nájdeš dopyt na ubytovanie, spusť workflow.`;
+    const [inbox, booking, megaub] = await Promise.all([
+      fetchGmail(8, 'in:inbox newer_than:7d'),
+      fetchGmail(5, 'in:inbox from:booking.com'),
+      fetchGmail(5, 'in:inbox from:megaubytovanie')
+    ]);
+    const all = [...(inbox||[]), ...(booking||[]), ...(megaub||[])];
+    const unique = all.filter((e,i,a) => a.findIndex(x=>x.id===e.id)===i);
+    if (!unique.length) { addBubble('agent','Žiadne emaily nenájdené alebo token expiroval – skúste prepojiť Google znova.', agent); return; }
+    const summary = unique.map(e=>`Od: ${e.from}\nPredmet: ${e.subject}\nDátum: ${e.date}\nNáhľad: ${e.snippet}`).join('\n\n---\n\n');
+    const prompt = `Toto sú moje emaily (inbox za 7 dní + všetky z booking.com a megaubytovanie):\n\n${summary}\n\nPrezri ich a identifikuj či sú tam dopyty na ubytovanie v Panorama Home alebo iné dôležité správy. Ak nájdeš dopyt na ubytovanie, spusť workflow.`;
     await sendWithContext(prompt, agent);
   } else if (type==='calendar') {
     addSystemMsg('Načítavam kalendár...');

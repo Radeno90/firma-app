@@ -720,36 +720,46 @@ function sendToAgent(fromAgentId, toAgentId, message) {
   fetchAgentReply(toAgentId, wrappedMsg);
 }
 
+function parseEur(text, label) {
+  // Matches: "Celkom: 281,00 €" or "celkom 281.00€" etc.
+  const r = new RegExp(label + '[^\\d]*(\\d+)[,\\.](\\d{2})\\s*€', 'i');
+  const m = text.match(r);
+  if (m) return parseFloat(m[1] + '.' + m[2]);
+  // fallback without cents
+  const r2 = new RegExp(label + '[^\\d]*(\\d+)\\s*€', 'i');
+  const m2 = text.match(r2);
+  if (m2) return parseFloat(m2[1]);
+  return 0;
+}
+
 function extractFakturaFromText(text, history) {
-  // Extract key data from Juraj's text response
+  const allText = history.map(m => m.content).join(' ') + ' ' + text;
+
   const cisloM = text.match(/260(\d{3})/);
-  const celkomM = text.match(/(?:celkom|spolu|uhradiť)[:\s*]*([\d,\.]+)\s*€/i) || text.match(/([\d,\.]+)\s*€.*?(?:celkom|spolu)/i);
-  const zalohaM = text.match(/záloha[^\d]*(\d+[\.,]?\d*)\s*€/i);
-  const zalohaDatM = text.match(/záloha[^\d]*\d+[\.,]?\d*\s*€[^\d]*([\d]{1,2}\.[\d]{1,2}\.[\d]{4})/i);
-  const menoM = text.match(/(?:meno|odberateľ)[:\s]+([A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽ][a-záäčďéíľňóôŕšťúýž]+ [A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽ][a-záäčďéíľňóôŕšťúýž]+)/i);
-  const datumyM = text.match(/(\d{1,2}\.\d{1,2}\.\d{4})[\s–-]+(\d{1,2}\.\d{1,2}\.\d{4})/);
-  const osobyM = text.match(/(\d+)\s*osôb/i);
-  const danM = text.match(/daň[^\d]*(\d+[\.,]?\d*)\s*€/i);
-  const saunaM = text.match(/sauna[^\d]*(\d+)\s*€/i);
+  const celkom = parseEur(text, 'Celkom') || parseEur(text, 'celkom') || parseEur(text, 'Spolu') || parseEur(text, 'Uhradiť');
+  const dan = parseEur(text, 'Daň') || parseEur(text, 'daň');
+  const sauna = parseEur(text, 'sauna') || parseEur(text, 'Sauna');
+  const zaloha = parseEur(text, 'Záloha') || parseEur(text, 'záloha') || (celkom * 0.5);
 
-  // Search in full history for address
-  const allText = history.map(m=>m.content).join(' ');
-  const adresaM = allText.match(/([A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽ][a-záäčďéíľňóôŕšťúýž]+\s+\d+),?\s+([A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽ][a-záäčďéíľňóôŕšťúýž]+)/);
+  const datumyM = allText.match(/(\d{1,2}\.\d{1,2}\.\d{4})[\s–-]+(\d{1,2}\.\d{1,2}\.\d{4})/);
+  const zalohaDatM = text.match(/záloha[^\d]*[\d,\.]+\s*€[^\d]*(\d{1,2}\.\d{1,2}\.\d{4})/i)
+                  || text.match(/splatná?\s+do\s+(\d{1,2}\.\d{1,2}\.\d{4})/i);
+  const osobyM = allText.match(/(\d+)\s*osôb/i);
+  const osoby = osobyM ? parseInt(osobyM[1]) : 3;
 
-  const celkom = celkomM ? parseFloat(celkomM[1].replace(',','.')) : 0;
-  const zaloha = zalohaM ? parseFloat(zalohaM[1].replace(',','.')) : celkom * 0.5;
-  const dan = danM ? parseFloat(danM[1].replace(',','.')) : 0;
-  const sauna = saunaM ? parseFloat(saunaM[1]) : 0;
-  const osoby = osobyM ? parseInt(osobyM[1]) : 0;
+  // Extract name from "Odberateľ: Lenka Hradická" or similar
+  const menoM = text.match(/(?:[Oo]dberateľ|[Mm]eno)[:\s,]+([A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽa-záäčďéíľňóôŕšťúýž]+ [A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽa-záäčďéíľňóôŕšťúýž]+)/);
+  const adresaM = allText.match(/([A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽa-záäčďéíľňóôŕšťúýž]+(?:\s+[A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽa-záäčďéíľňóôŕšťúýž]+)?\s+\d+),\s*([\d]{3}\s?\d{2}\s+[A-ZÁÄČĎÉÍĽŇÓÔŔŠŤÚÝŽa-záäčďéíľňóôŕšťúýž]+)/);
 
   if (!celkom) return null;
 
   const dnes = new Date();
-  const datum = dnes.getDate()+'.'+(dnes.getMonth()+1)+'.'+dnes.getFullYear();
+  const datum = dnes.getDate() + '.' + (dnes.getMonth()+1) + '.' + dnes.getFullYear();
+  const pobytSuma = Math.round((celkom - dan - sauna) * 100) / 100;
 
   return {
-    cislo: cisloM ? '260'+cisloM[1] : '260001',
-    datum: datum,
+    cislo: cisloM ? '260' + cisloM[1] : '260020',
+    datum,
     splatnost: datumyM ? datumyM[1] : datum,
     odberatel: {
       meno: menoM ? menoM[1] : '',
@@ -758,13 +768,15 @@ function extractFakturaFromText(text, history) {
       ico: '', dic: ''
     },
     pobyt: {
-      popis: datumyM ? `ubytovanie v Panorama home Valčianska dolina, ${osoby} osôb, ${datumyM[1]}–${datumyM[2]}` : 'ubytovanie v Panorama home Valčianska dolina',
-      suma: celkom - dan - sauna
+      popis: datumyM
+        ? `ubytovanie v Panorama home Valčianska dolina, ${osoby} osôb, ${datumyM[1]}–${datumyM[2]}`
+        : 'ubytovanie v Panorama home Valčianska dolina',
+      suma: pobytSuma
     },
     dan: { pocet: osoby * 2, suma: dan },
-    sauna: sauna,
-    celkom: celkom,
-    zaloha: zaloha,
+    sauna,
+    celkom,
+    zaloha,
     zaloha_datum: zalohaDatM ? zalohaDatM[1] : datum
   };
 }

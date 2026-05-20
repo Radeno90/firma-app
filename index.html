@@ -794,12 +794,24 @@ function generatePDF(data) {
   const taxY = 126 + pobytLines.length * 4 + 4;
   doc.text('daň z ubytovania obec Valča', ml, taxY);
   doc.text('ks', 120, taxY);
-  doc.text(data.dan.pocet.toFixed(3), 135, taxY);
+  doc.text(String(data.dan.pocet), 135, taxY);
   doc.text('1,00', 155, taxY);
   doc.text(data.dan.suma.toFixed(2), 180, taxY, {align:'right'});
 
+  // Row 3 - sauna (optional)
+  let saunaOffset = 0;
+  if (data.sauna && data.sauna > 0) {
+    saunaOffset = 8;
+    const saunaY = taxY + saunaOffset;
+    doc.text('vonkajšia sauna', ml, saunaY);
+    doc.text('ks', 120, saunaY);
+    doc.text('1', 135, saunaY);
+    doc.text(data.sauna.toFixed(2), 155, saunaY);
+    doc.text(data.sauna.toFixed(2), 180, saunaY, {align:'right'});
+  }
+
   // Totals
-  const totY = taxY + 12;
+  const totY = taxY + saunaOffset + 12;
   doc.line(ml, totY - 4, mr, totY - 4);
   doc.setFont('helvetica','bold');
   doc.setFontSize(10);
@@ -832,14 +844,84 @@ function generatePDF(data) {
 }
 
 function tryParseFakturaJSON(reply) {
-  const match = reply.match(/FAKTURA_JSON:(\{[^}]+(?:\{[^}]*\}[^}]*)*\})/);
-  if (!match) return null;
-  try {
-    return JSON.parse(match[1]);
-  } catch(e) {
-    console.error('FAKTURA_JSON parse error:', e);
-    return null;
+  // Try our FAKTURA_JSON marker first
+  const markerIdx = reply.indexOf('FAKTURA_JSON:');
+  if (markerIdx >= 0) {
+    try {
+      const jsonStr = reply.substring(markerIdx + 13);
+      const parsed = JSON.parse(jsonStr.trim());
+      return normalizeFakturaData(parsed);
+    } catch(e) {}
   }
+  // Try any JSON block in reply (Juraj may output raw JSON)
+  const jsonMatch = reply.match(/\{[\s\S]*"cislo_faktury"[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return normalizeFakturaData(parsed);
+    } catch(e) {}
+  }
+  // Try ```json blocks
+  const codeMatch = reply.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeMatch) {
+    try {
+      const parsed = JSON.parse(codeMatch[1].trim());
+      return normalizeFakturaData(parsed);
+    } catch(e) {}
+  }
+  return null;
+}
+
+function normalizeFakturaData(d) {
+  // Handle both our format and Juraj's format
+  if (!d) return null;
+  
+  // Juraj's format conversion
+  const polozky = d.polozky || [];
+  const pobytItem = polozky.find(p => p.popis && p.popis.toLowerCase().includes('ubytovan')) || polozky[0] || {};
+  const danItem = polozky.find(p => p.popis && p.popis.toLowerCase().includes('daň')) || polozky[1] || {};
+  const saunaItem = polozky.find(p => p.popis && p.popis.toLowerCase().includes('sauna'));
+  
+  const saunaExtra = saunaItem ? saunaItem.suma_eur || 0 : 0;
+  
+  const cislo = d.cislo || d.cislo_faktury || d.number || '260001';
+  const datum = formatDate(d.datum_vyhotovenia || d.datum || new Date().toISOString().slice(0,10));
+  const splatnost = formatDate(d.datum_splatnosti || d.splatnost || d.datum_vyhotovenia || datum);
+  
+  const meno = d.odberatel?.meno || d.odberatel?.nazov || '';
+  const adresa = d.odberatel?.adresa || d.odberatel?.ulica || '';
+  const mesto = d.odberatel?.mesto || d.odberatel?.psc_mesto || '';
+  
+  const pobytSuma = pobytItem.suma_eur || pobytItem.suma || d.pobyt?.suma || 0;
+  const danSuma = danItem.suma_eur || danItem.suma || d.dan?.suma || 0;
+  const danPocet = danItem.pocet_ks || danItem.pocet || d.dan?.pocet || 0;
+  const celkom = (d.celkom_s_DPH_eur || d.celkom_bez_DPH_eur || d.celkom || (pobytSuma + danSuma + saunaExtra));
+  
+  const zalohaObj = d.zaloha || {};
+  const zaloha = zalohaObj.suma_eur || zalohaObj.suma || d.zaloha || (celkom * 0.5);
+  const zalohaDatum = formatDate(zalohaObj.splatna_do || zalohaObj.datum || d.zaloha_datum || datum);
+  
+  const pobytPopis = pobytItem.popis || d.pobyt?.popis || 'ubytovanie v Panorama home Valčianska dolina';
+  
+  return {
+    cislo, datum, splatnost,
+    odberatel: { meno, adresa, mesto, ico: d.odberatel?.ico || '', dic: d.odberatel?.dic || '' },
+    pobyt: { popis: pobytPopis, suma: Number(pobytSuma) },
+    dan: { pocet: Number(danPocet), suma: Number(danSuma) },
+    sauna: Number(saunaExtra),
+    celkom: Number(celkom),
+    zaloha: Number(zaloha),
+    zaloha_datum: zalohaDatum
+  };
+}
+
+function formatDate(str) {
+  if (!str) return '';
+  if (str.includes('.')) return str;
+  // ISO format YYYY-MM-DD
+  const parts = str.split('-');
+  if (parts.length === 3) return parts[2]+'.'+parts[1]+'.'+parts[0];
+  return str;
 }
 
 function checkForAgentHandoff(reply, fromAgentId) {

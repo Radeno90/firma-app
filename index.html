@@ -349,18 +349,35 @@ async function fetchGmail(maxResults = 10, query = 'in:inbox newer_than:7d') {
   } catch(e) { return null; }
 }
 
+function decodeBase64(data) {
+  try {
+    const b64 = data.replace(/-/g,'+').replace(/_/g,'/');
+    const decoded = atob(b64);
+    return decodeURIComponent(escape(decoded));
+  } catch(e) {
+    try { return atob(data.replace(/-/g,'+').replace(/_/g,'/')); } catch(e2) { return ''; }
+  }
+}
+
 function extractBody(payload) {
   if (!payload) return '';
-  if (payload.body?.data) {
-    try { return atob(payload.body.data.replace(/-/g,'+').replace(/_/g,'/')); } catch(e) { return ''; }
+  // direct body
+  if (payload.body?.data) return decodeBase64(payload.body.data);
+  if (!payload.parts) return '';
+  // prefer text/plain
+  for (const part of payload.parts) {
+    if (part.mimeType === 'text/plain' && part.body?.data) return decodeBase64(part.body.data);
   }
-  if (payload.parts) {
-    for (const part of payload.parts) {
-      if (part.mimeType === 'text/plain' && part.body?.data) {
-        try { return atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/')); } catch(e) {}
-      }
+  // fallback to text/html stripped
+  for (const part of payload.parts) {
+    if (part.mimeType === 'text/html' && part.body?.data) {
+      const html = decodeBase64(part.body.data);
+      return html.replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
     }
-    for (const part of payload.parts) {
+  }
+  // recurse into multipart
+  for (const part of payload.parts) {
+    if (part.mimeType?.startsWith('multipart/')) {
       const nested = extractBody(part);
       if (nested) return nested;
     }
@@ -464,8 +481,8 @@ async function quickAction(type) {
     const [inbox, booking, megaub, hauzi] = await Promise.all([
       fetchGmail(8, 'in:inbox newer_than:7d'),
       fetchGmail(8, 'from:booking.com newer_than:30d'),
-      fetchGmail(8, 'from:megaubytovanie.sk newer_than:60d'),
-      fetchGmail(8, 'from:hauzi.sk newer_than:60d')
+      fetchGmail(8, 'from:megaubytovanie.sk newer_than:90d'),
+      fetchGmail(8, 'from:hauzi.sk newer_than:90d')
     ]);
     const all = [...(inbox||[]), ...(booking||[]), ...(megaub||[]), ...(hauzi||[])];
     const unique = all.filter((e,i,a) => a.findIndex(x=>x.id===e.id)===i);

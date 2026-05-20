@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root {
   --bg: #0f0f0f;
@@ -108,6 +109,8 @@ html,body { height:100%; width:100%; background:var(--bg); color:var(--text); fo
 .chat-send { width:42px; height:42px; border-radius:50%; background:var(--accent); border:none; color:#0f0f0f; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .chat-send:active { opacity:0.7; }
 .chat-send:disabled { background:var(--surface2); color:var(--text3); }
+.pdf-btn { background:var(--surface2); border:0.5px solid var(--border2); border-radius:10px; padding:10px 16px; color:#e8a84a; font-family:var(--font-body); font-size:0.85rem; cursor:pointer; width:100%; text-align:left; margin-top:6px; display:flex; align-items:center; gap:8px; }
+.pdf-btn:active { opacity:0.7; }
 .quick-actions { display:flex; gap:6px; padding:0 1rem 0.5rem; overflow-x:auto; flex-shrink:0; }
 .qa-btn { background:var(--surface); border:0.5px solid var(--border2); border-radius:20px; padding:6px 12px; font-size:0.75rem; color:var(--text2); cursor:pointer; white-space:nowrap; font-family:var(--font-body); flex-shrink:0; }
 .qa-btn:active { background:var(--surface2); color:var(--text); }
@@ -272,22 +275,20 @@ Prevádzka: Valčianska dolina | IČO: 50608550 | DIČ: 2120397851
 IBAN: SK48 8330 0000 0024 0205 3200 | Fio banka 2402053200/8330 | SWIFT: FIOZSKBAXXX
 Vystavil: Radovan Vojvoda | www.panoramahome.sk
 
-FAKTÚRA obsahuje:
+ŠTRUKTÚRA FAKTÚRY:
 Položka 1: "ubytovanie v Panorama home Valčianska dolina, X osôb, DD.MM.–DD.MM.RRRR" — 1,000 ks — suma bez DPH
 Položka 2: "daň z ubytovania obec Valča" — [osoby×noci] ks — 1,00€/ks
 Celkom = suma (nie sme platca DPH) | Záloha 50% splatná [dátum] | Číslo faktúry: 26XXXX
 
-Keď dostaneš údaje hosťa, vypíš kompletný návrh faktúry.
+Keď dostaneš údaje hosťa, najprv vypíš textový návrh faktúry, potom NA KONCI pridaj JSON blok pre PDF generovanie:
+FAKTURA_JSON:{"cislo":"260XX","datum":"DD.MM.RRRR","splatnost":"DD.MM.RRRR","odberatel":{"meno":"X","adresa":"X","mesto":"X","ico":"","dic":""},"pobyt":{"popis":"ubytovanie v Panorama home Valčianska dolina, X osôb, DD.MM.–DD.MM.RRRR","suma":000.00},"dan":{"pocet":0,"suma":0.00},"celkom":000.00,"zaloha":000.00,"zaloha_datum":"DD.MM.RRRR"}
 
 KOMUNIKÁCIA S KOLEGAMI:
-Ak potrebuješ delegovať úlohu kolegovi, použi JSON marker NA KONCI správy (po svojom texte):
-SEND_TO:{"to":"juraj","data":"Meno: X | Adresa: X | Dátumy: X | Osoby: X | Cena: X€ | Daň: X€ | Záloha: X€ do X"}
-SEND_TO:{"to":"peter","data":"úloha pre Petra"}
-SEND_TO:{"to":"lucia","data":"úloha pre Luciu"}
-SEND_TO:{"to":"zuzana","data":"úloha pre Zuzanu"}
-
-DÔLEŽITÉ: Keď hosť pošle svoje údaje (meno, adresa) a ty máš všetky info na faktúru, VŽDY na konci odpovede pridaj SEND_TO pre Juraja.
-Keď si vypočítala cenu a chceš skontrolovať kalendár, pridaj SEND_TO pre Martinu (seba) nie je potrebné.`
+Ak potrebuješ delegovať úlohu kolegovi, pridaj JSON marker NA KONCI správy:
+SEND_TO:{"to":"martina","data":"popis úlohy"}
+SEND_TO:{"to":"peter","data":"popis úlohy"}
+SEND_TO:{"to":"lucia","data":"popis úlohy"}
+SEND_TO:{"to":"zuzana","data":"popis úlohy"}`
   },
   {
     id: 'peter', name: 'Peter', role: 'Sales Manager', initials: 'PE', color: 'color-coral',
@@ -620,6 +621,24 @@ function addSystemMsg(text) {
   box.appendChild(d); box.scrollTop = box.scrollHeight;
 }
 
+function addPDFButton(fakturaData) {
+  const box = document.getElementById('messages');
+  const btn = document.createElement('button');
+  btn.className = 'pdf-btn';
+  btn.innerHTML = '⬇ Stiahnuť faktúru ' + fakturaData.cislo + ' ako PDF';
+  btn.onclick = () => {
+    if (!window.jspdf) { alert('PDF knižnica sa načítava, skúste znova.'); return; }
+    generatePDF(fakturaData);
+    btn.innerHTML = '✓ Faktúra stiahnutá';
+    btn.style.color = '#4ecb9a';
+  };
+  const row = document.createElement('div');
+  row.style.cssText = 'padding:0 36px;animation:fadeUp 0.2s ease;';
+  row.appendChild(btn);
+  box.appendChild(row);
+  box.scrollTop = box.scrollHeight;
+}
+
 function showThinking(agent) {
   const box = document.getElementById('messages');
   const row = document.createElement('div');
@@ -696,6 +715,133 @@ function sendToAgent(fromAgentId, toAgentId, message) {
   fetchAgentReply(toAgentId, wrappedMsg);
 }
 
+function generatePDF(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const W = 210, ml = 15, mr = 195;
+
+  // Header
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(18);
+  doc.text('FAKTÚRA č.: ' + data.cislo, mr, 25, {align:'right'});
+  doc.setFontSize(10);
+  doc.text('Variabilný symbol: ' + data.cislo, mr, 31, {align:'right'});
+
+  // Supplier
+  doc.setFontSize(11);
+  doc.setFont('helvetica','bold');
+  doc.text('TRIMEX DOMY, s.r.o.', ml, 25);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  doc.text('Benkova 1263/2', ml, 31);
+  doc.text('91501 Nové Mesto nad Váhom', ml, 36);
+  doc.text('Prevádzka: Valčianska dolina', ml, 41);
+  doc.text('Tel: +421 907 647 718', ml, 46);
+  doc.text('IČO: 50608550', ml, 52);
+  doc.text('DIČ: 2120397851', ml, 57);
+
+  // Bank
+  doc.text('Peňažný ústav: Fio banka', ml, 63);
+  doc.text('IBAN: SK48 8330 0000 0024 0205 3200', ml, 68);
+  doc.text('Účet: 2402053200 / 8330', ml, 73);
+  doc.text('SWIFT: FIOZSKBAXXX', ml, 78);
+
+  // Divider
+  doc.setDrawColor(180);
+  doc.line(ml, 83, mr, 83);
+
+  // Dates
+  doc.setFontSize(9);
+  doc.text('Dátum vyhotovenia: ' + data.datum, ml, 89);
+  doc.text('Dátum splatnosti: ' + data.splatnost, ml, 94);
+  doc.text('Dátum dodania: ' + data.datum, ml, 99);
+
+  // Recipient
+  const cx = 110;
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(10);
+  doc.text('Odberateľ:', cx, 89);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  doc.text(data.odberatel.meno, cx, 95);
+  doc.text(data.odberatel.adresa, cx, 101);
+  doc.text(data.odberatel.mesto, cx, 107);
+  if (data.odberatel.ico) doc.text('IČO: ' + data.odberatel.ico, cx, 113);
+
+  // Table header
+  doc.setDrawColor(180);
+  doc.line(ml, 112, mr, 112);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.text('Popis', ml, 118);
+  doc.text('MJ', 120, 118);
+  doc.text('Počet', 135, 118);
+  doc.text('Cena MJ', 155, 118);
+  doc.text('Celkom', 180, 118, {align:'right'});
+  doc.line(ml, 120, mr, 120);
+
+  // Row 1 - accommodation
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  const pobytLines = doc.splitTextToSize(data.pobyt.popis, 100);
+  doc.text(pobytLines, ml, 126);
+  doc.text('ks', 120, 126);
+  doc.text('1,000', 135, 126);
+  doc.text(data.pobyt.suma.toFixed(2), 155, 126);
+  doc.text(data.pobyt.suma.toFixed(2), 180, 126, {align:'right'});
+
+  // Row 2 - tax
+  const taxY = 126 + pobytLines.length * 4 + 4;
+  doc.text('daň z ubytovania obec Valča', ml, taxY);
+  doc.text('ks', 120, taxY);
+  doc.text(data.dan.pocet.toFixed(3), 135, taxY);
+  doc.text('1,00', 155, taxY);
+  doc.text(data.dan.suma.toFixed(2), 180, taxY, {align:'right'});
+
+  // Totals
+  const totY = taxY + 12;
+  doc.line(ml, totY - 4, mr, totY - 4);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(10);
+  doc.text('Celkom bez DPH:', 140, totY);
+  doc.text(data.celkom.toFixed(2) + ' EUR', 180, totY, {align:'right'});
+  doc.text('Celkom:', 140, totY + 7);
+  doc.text(data.celkom.toFixed(2) + ' EUR', 180, totY + 7, {align:'right'});
+  doc.setDrawColor(100);
+  doc.setLineWidth(0.5);
+  doc.rect(130, totY + 10, 65, 9);
+  doc.setFontSize(11);
+  doc.text('Uhradiť:', 140, totY + 17);
+  doc.text(data.celkom.toFixed(2) + ' EUR', 180, totY + 17, {align:'right'});
+  doc.setLineWidth(0.2);
+
+  // Footnote
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  doc.text('záloha 50% ' + data.zaloha.toFixed(2) + ' EUR splatná ' + data.zaloha_datum, ml, totY + 28);
+  doc.text('Faktúra je vyhotovená elektronicky a je platná aj bez podpisu.', ml, totY + 34);
+  doc.text('www.panoramahome.sk', ml, totY + 40);
+  doc.text('Vystavil: Radovan Vojvoda', mr, totY + 40, {align:'right'});
+
+  // Footer line
+  doc.setDrawColor(180);
+  doc.line(ml, totY + 44, mr, totY + 44);
+
+  doc.save('faktura-' + data.cislo + '.pdf');
+  return true;
+}
+
+function tryParseFakturaJSON(reply) {
+  const match = reply.match(/FAKTURA_JSON:(\{[^}]+(?:\{[^}]*\}[^}]*)*\})/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch(e) {
+    console.error('FAKTURA_JSON parse error:', e);
+    return null;
+  }
+}
+
 function checkForAgentHandoff(reply, fromAgentId) {
   const fromAgent = AGENTS.find(a => a.id === fromAgentId);
   const regex = /SEND_TO:\{[^}]+\}/g;
@@ -742,17 +888,24 @@ async function sendWithContext(userText, agent) {
     const reply = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
     if (reply) {
       const hasHandoff = checkForAgentHandoff(reply, agent.id);
-      const cleanReply = reply.replace(/SEND_TO:\{[^}]+\}/g, '').trim();
+      const fakturaData = agent.id === 'juraj' ? tryParseFakturaJSON(reply) : null;
+      const cleanReply = reply
+        .replace(/SEND_TO:\{[^\n]+\}/g, '')
+        .replace(/FAKTURA_JSON:\{[\s\S]*?\}(?=\s|$)/, '')
+        .trim();
       if (cleanReply) {
         addBubble('agent', cleanReply, agent);
         state.histories[agent.id].push({role:'assistant', content:cleanReply});
+      }
+      if (fakturaData) {
+        addPDFButton(fakturaData);
       }
       if (hasHandoff) {
         setTimeout(() => {
           const sendMatch = reply.match(/SEND_TO:\{"to":"([^"]+)"/);
           if (sendMatch) {
             const targetAgent = AGENTS.find(a=>a.id===sendMatch[1]);
-            if (targetAgent) addBubble('agent', `Preposlala som úlohu kolegovi ${targetAgent.name}. Otvor jeho chat pre výsledok.`, agent);
+            if (targetAgent) addBubble('agent', `Preposlal som úlohu kolegovi ${targetAgent.name}. Otvor jeho chat pre výsledok.`, agent);
           }
         }, 400);
       }

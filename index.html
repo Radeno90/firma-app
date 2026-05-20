@@ -463,15 +463,18 @@ async function quickAction(type) {
     addSystemMsg('Načítavam emaily...');
     const [inbox, booking, megaub, hauzi] = await Promise.all([
       fetchGmail(8, 'in:inbox newer_than:7d'),
-      fetchGmail(8, 'from:booking.com'),
-      fetchGmail(8, 'from:megaubytovanie.sk'),
-      fetchGmail(8, 'from:hauzi.sk')
+      fetchGmail(8, 'from:booking.com newer_than:30d'),
+      fetchGmail(8, 'from:megaubytovanie.sk newer_than:60d'),
+      fetchGmail(8, 'from:hauzi.sk newer_than:60d')
     ]);
     const all = [...(inbox||[]), ...(booking||[]), ...(megaub||[]), ...(hauzi||[])];
     const unique = all.filter((e,i,a) => a.findIndex(x=>x.id===e.id)===i);
     if (!unique.length) { addBubble('agent','Žiadne emaily nenájdené alebo token expiroval – skúste prepojiť Google znova.', agent); return; }
-    const summary = unique.map(e=>`Od: ${e.from}\nPredmet: ${e.subject}\nDátum: ${e.date}\nObsah: ${e.body ? e.body.substring(0,1500) : e.snippet}`).join('\n\n---\n\n');
-    const prompt = `Toto sú moje emaily (inbox za 7 dní + všetky z booking.com, megaubytovanie.sk, hauzi.sk):\n\n${summary}\n\nPrezri ich dôkladne. Hľadaj: 1) dopyty na ubytovanie v Panorama Home (dátumy, počet osôb) 2) správy od hostí (otázky, potvrdenia) 3) iné dôležité správy. Pre každý dopyt na ubytovanie okamžite spusť workflow - vypočítaj cenu a priprav email.`;
+    const summary = unique.map(e=>{
+      const bodyText = e.body ? e.body.replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim().substring(0,2000) : e.snippet;
+      return `Od: ${e.from}\nPredmet: ${e.subject}\nDátum: ${e.date}\nObsah:\n${bodyText}`;
+    }).join('\n\n═══════════════\n\n');
+    const prompt = `Toto sú moje emaily z portálov a inboxu:\n\n${summary}\n\nDôležité: emaily z megaubytovanie.sk a hauzi.sk obsahujú PLNÝ TEXT rezervácie vrátane dátumov a počtu osôb. Preštuduj každý email a:\n1. Pre každý DOPYT alebo REZERVÁCIU s dátumami: okamžite vypočítaj cenu podľa cenníka a priprav kompletný vyplnený email hosťovi\n2. Pre správy od existujúcich hostí: zhrň čo chcú\n3. Ostatné: ignoruj\nNEPYTAJ SA na ďalšie info ak máš dátumy a počet osôb v texte emailu.`;
     await sendWithContext(prompt, agent);
   } else if (type==='calendar') {
     addSystemMsg('Načítavam kalendár...');

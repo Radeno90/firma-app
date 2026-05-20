@@ -388,6 +388,37 @@ function extractBody(payload) {
   return '';
 }
 
+async function fetchThreads(maxResults = 5, query = '') {
+  if (!state.googleToken) return null;
+  try {
+    const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=${maxResults}&q=${encodeURIComponent(query)}`, {
+      headers: { Authorization: 'Bearer ' + state.googleToken }
+    });
+    const data = await r.json();
+    if (!data.threads) return [];
+    const threads = await Promise.all(data.threads.map(async t => {
+      const d = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}?format=full`, {
+        headers: { Authorization: 'Bearer ' + state.googleToken }
+      });
+      return d.json();
+    }));
+    return threads.map(thread => {
+      const msgs = thread.messages || [];
+      const parts = msgs.map(m => {
+        const h = m.payload?.headers || [];
+        const get = n => h.find(x=>x.name===n)?.value||'';
+        const body = extractBody(m.payload);
+        const clean = body.replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim().substring(0,1500);
+        return `  [${get('Date')}] Od: ${get('From')}\n  ${clean}`;
+      }).join('\n\n');
+      const first = msgs[0];
+      const fh = first?.payload?.headers||[];
+      const subj = fh.find(x=>x.name==='Subject')?.value||'';
+      return `THREAD: ${subj} (${msgs.length} správ)\n${parts}`;
+    });
+  } catch(e) { console.error('fetchThreads error:', e); return null; }
+}
+
 async function fetchCalendar(days = 7) {
   if (!state.googleToken) return null;
   try {
@@ -480,21 +511,17 @@ async function quickAction(type) {
     return;
   }
   if (type==='email') {
-    addSystemMsg('Načítavam emaily...');
-    const [inbox, booking, megaub, hauzi] = await Promise.all([
+    addSystemMsg('Načítavam emaily a thready...');
+    const [inbox, megaubThreads, hauziThreads, bookingThreads] = await Promise.all([
       fetchGmail(8, 'in:inbox newer_than:7d'),
-      fetchGmail(8, 'from:booking.com newer_than:30d'),
-      fetchGmail(8, 'from:megaubytovanie.sk newer_than:90d'),
-      fetchGmail(8, 'from:hauzi.sk newer_than:90d')
+      fetchThreads(5, 'from:megaubytovanie.sk newer_than:90d'),
+      fetchThreads(5, 'from:hauzi.sk newer_than:90d'),
+      fetchThreads(5, 'from:booking.com newer_than:30d')
     ]);
-    const all = [...(inbox||[]), ...(booking||[]), ...(megaub||[]), ...(hauzi||[])];
-    const unique = all.filter((e,i,a) => a.findIndex(x=>x.id===e.id)===i);
-    if (!unique.length) { addBubble('agent','Žiadne emaily nenájdené alebo token expiroval – skúste prepojiť Google znova.', agent); return; }
-    const summary = unique.map(e=>{
-      const bodyText = e.body ? e.body.replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim().substring(0,2000) : e.snippet;
-      const isMegaHauzi = e.from.includes('megaubytovanie') || e.from.includes('hauzi') || e.from.includes('booking'); return `Od: ${e.from}\nPredmet: ${e.subject}\nDátum: ${e.date}\nObsah:\n${isMegaHauzi ? (e.body ? e.body.replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim().substring(0,4000) : e.snippet) : bodyText}`;
-    }).join('\n\n═══════════════\n\n');
-    const prompt = `Toto sú moje emaily z portálov a inboxu:\n\n${summary}\n\nDôležité: emaily z megaubytovanie.sk a hauzi.sk obsahujú PLNÝ TEXT rezervácie vrátane dátumov a počtu osôb. Preštuduj každý email a:\n1. Pre každý DOPYT alebo REZERVÁCIU s dátumami: okamžite vypočítaj cenu podľa cenníka a priprav kompletný vyplnený email hosťovi\n2. Pre správy od existujúcich hostí: zhrň čo chcú\n3. Ostatné: ignoruj\nNEPYTAJ SA na ďalšie info ak máš dátumy a počet osôb v texte emailu.`;
+    const inboxSummary = (inbox||[]).map(e=>`Od: ${e.from}\nPredmet: ${e.subject}\nDátum: ${e.date}\nObsah: ${e.body ? e.body.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().substring(0,800) : e.snippet}`).join('\n\n---\n\n');
+    const portalSummary = [...(megaubThreads||[]), ...(hauziThreads||[]), ...(bookingThreads||[])].join('\n\n═══════════════\n\n');
+    if (!inboxSummary && !portalSummary) { addBubble('agent','Žiadne emaily nenájdené alebo token expiroval.', agent); return; }
+    const prompt = `INBOX (posledných 7 dní):\n${inboxSummary||'prázdny'}\n\n═══ REZERVAČNÉ PORTÁLY (kompletné thready) ═══\n${portalSummary||'žiadne'}\n\nAnalyzuj každý thread z portálov a urči jeho stav:\n- VYBAVENÉ: ak je tam už moja odpoveď s cenovou ponukou alebo faktúrou\n- ČAKÁ NA ODPOVEĎ: ak hosť odpovedal a čaká na moju reakciu\n- NOVÝ DOPYT: ak som ešte neodpovedal\nPre NOVÉ DOPYTY a ČAKAJÚCE: vypočítaj cenu a priprav email. Pre VYBAVENÉ: len stručne zhrň stav.`;
     await sendWithContext(prompt, agent);
   } else if (type==='calendar') {
     addSystemMsg('Načítavam kalendár...');

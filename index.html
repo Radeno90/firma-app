@@ -910,30 +910,27 @@ function generatePDF(data) {
 }
 
 function tryParseFakturaJSON(reply) {
-  // Try our FAKTURA_JSON marker first
+  // Try FAKTURA_JSON: marker - find the JSON object after it
   const markerIdx = reply.indexOf('FAKTURA_JSON:');
   if (markerIdx >= 0) {
-    try {
-      const jsonStr = reply.substring(markerIdx + 13);
-      const parsed = JSON.parse(jsonStr.trim());
-      return normalizeFakturaData(parsed);
-    } catch(e) {}
-  }
-  // Try any JSON block in reply (Juraj may output raw JSON)
-  const jsonMatch = reply.match(/\{[\s\S]*"cislo_faktury"[\s\S]*\}/);
-  if (jsonMatch) {
-    try {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return normalizeFakturaData(parsed);
-    } catch(e) {}
+    const afterMarker = reply.substring(markerIdx + 13).trim();
+    // Find matching braces
+    let depth = 0, start = -1, end = -1;
+    for (let i = 0; i < afterMarker.length; i++) {
+      if (afterMarker[i] === '{') { if (depth === 0) start = i; depth++; }
+      else if (afterMarker[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (start >= 0 && end > start) {
+      try {
+        const parsed = JSON.parse(afterMarker.substring(start, end + 1));
+        return normalizeFakturaData(parsed);
+      } catch(e) { console.error('FAKTURA_JSON parse fail:', e); }
+    }
   }
   // Try ```json blocks
   const codeMatch = reply.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (codeMatch) {
-    try {
-      const parsed = JSON.parse(codeMatch[1].trim());
-      return normalizeFakturaData(parsed);
-    } catch(e) {}
+    try { return normalizeFakturaData(JSON.parse(codeMatch[1].trim())); } catch(e) {}
   }
   return null;
 }

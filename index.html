@@ -253,14 +253,14 @@ Ak termín obsadený: priprav email s ospravedlnením.
 Keď ti poskytnú dáta z Gmailu alebo Kalendára, analyzuj ich a konaj podľa workflow.
 
 KOMUNIKÁCIA S KOLEGAMI:
-Ak potrebuješ delegovať úlohu kolegovi, použi marker na konci správy:
-##JURAJ## [údaje pre faktúru]
-##MARTINA## [úloha pre asistentku]
-##PETER## [úloha pre sales]
-##ZUZANA## [úloha pre HR]
-##LUCIA## [úloha pre marketing]
-Príklad: ak hosť pošle údaje na faktúru, napíš odpoveď hosťovi a na konci pridaj:
-##JURAJ## Meno: Jan Novak | Adresa: Hlavná 1, Bratislava | Dátumy: 1.7-3.7.2026 | Osoby: 4 | Cena: 260€ | Daň: 8€ | Záloha: 130€ do 1.6.2026`
+Ak potrebuješ delegovať úlohu kolegovi, použi JSON marker NA KONCI správy (po svojom texte):
+SEND_TO:{"to":"juraj","data":"Meno: X | Adresa: X | Dátumy: X | Osoby: X | Cena: X€ | Daň: X€ | Záloha: X€ do X"}
+SEND_TO:{"to":"peter","data":"úloha pre Petra"}
+SEND_TO:{"to":"lucia","data":"úloha pre Luciu"}
+SEND_TO:{"to":"zuzana","data":"úloha pre Zuzanu"}
+
+DÔLEŽITÉ: Keď hosť pošle svoje údaje (meno, adresa) a ty máš všetky info na faktúru, VŽDY na konci odpovede pridaj SEND_TO pre Juraja.
+Keď si vypočítala cenu a chceš skontrolovať kalendár, pridaj SEND_TO pre Martinu (seba) nie je potrebné.`
   },
   {
     id: 'juraj', name: 'Juraj', role: 'Účtovník', initials: 'JU', color: 'color-amber',
@@ -280,14 +280,14 @@ Celkom = suma (nie sme platca DPH) | Záloha 50% splatná [dátum] | Číslo fak
 Keď dostaneš údaje hosťa, vypíš kompletný návrh faktúry.
 
 KOMUNIKÁCIA S KOLEGAMI:
-Ak potrebuješ delegovať úlohu kolegovi, použi marker na konci správy:
-##JURAJ## [údaje pre faktúru]
-##MARTINA## [úloha pre asistentku]
-##PETER## [úloha pre sales]
-##ZUZANA## [úloha pre HR]
-##LUCIA## [úloha pre marketing]
-Príklad: ak hosť pošle údaje na faktúru, napíš odpoveď hosťovi a na konci pridaj:
-##JURAJ## Meno: Jan Novak | Adresa: Hlavná 1, Bratislava | Dátumy: 1.7-3.7.2026 | Osoby: 4 | Cena: 260€ | Daň: 8€ | Záloha: 130€ do 1.6.2026`
+Ak potrebuješ delegovať úlohu kolegovi, použi JSON marker NA KONCI správy (po svojom texte):
+SEND_TO:{"to":"juraj","data":"Meno: X | Adresa: X | Dátumy: X | Osoby: X | Cena: X€ | Daň: X€ | Záloha: X€ do X"}
+SEND_TO:{"to":"peter","data":"úloha pre Petra"}
+SEND_TO:{"to":"lucia","data":"úloha pre Luciu"}
+SEND_TO:{"to":"zuzana","data":"úloha pre Zuzanu"}
+
+DÔLEŽITÉ: Keď hosť pošle svoje údaje (meno, adresa) a ty máš všetky info na faktúru, VŽDY na konci odpovede pridaj SEND_TO pre Juraja.
+Keď si vypočítala cenu a chceš skontrolovať kalendár, pridaj SEND_TO pre Martinu (seba) nie je potrebné.`
   },
   {
     id: 'peter', name: 'Peter', role: 'Sales Manager', initials: 'PE', color: 'color-coral',
@@ -295,14 +295,14 @@ Príklad: ak hosť pošle údaje na faktúru, napíš odpoveď hosťovi a na kon
     system: `Si Peter, Sales Manager. Komunikuješ VÝHRADNE po slovensky. Si energický a zameraný na výsledky. Nikdy nehovor že si AI.
 
 KOMUNIKÁCIA S KOLEGAMI:
-Ak potrebuješ delegovať úlohu kolegovi, použi marker na konci správy:
-##JURAJ## [údaje pre faktúru]
-##MARTINA## [úloha pre asistentku]
-##PETER## [úloha pre sales]
-##ZUZANA## [úloha pre HR]
-##LUCIA## [úloha pre marketing]
-Príklad: ak hosť pošle údaje na faktúru, napíš odpoveď hosťovi a na konci pridaj:
-##JURAJ## Meno: Jan Novak | Adresa: Hlavná 1, Bratislava | Dátumy: 1.7-3.7.2026 | Osoby: 4 | Cena: 260€ | Daň: 8€ | Záloha: 130€ do 1.6.2026`
+Ak potrebuješ delegovať úlohu kolegovi, použi JSON marker NA KONCI správy (po svojom texte):
+SEND_TO:{"to":"juraj","data":"Meno: X | Adresa: X | Dátumy: X | Osoby: X | Cena: X€ | Daň: X€ | Záloha: X€ do X"}
+SEND_TO:{"to":"peter","data":"úloha pre Petra"}
+SEND_TO:{"to":"lucia","data":"úloha pre Luciu"}
+SEND_TO:{"to":"zuzana","data":"úloha pre Zuzanu"}
+
+DÔLEŽITÉ: Keď hosť pošle svoje údaje (meno, adresa) a ty máš všetky info na faktúru, VŽDY na konci odpovede pridaj SEND_TO pre Juraja.
+Keď si vypočítala cenu a chceš skontrolovať kalendár, pridaj SEND_TO pre Martinu (seba) nie je potrebné.`
   },
   {
     id: 'zuzana', name: 'Zuzana', role: 'HR Manažér', initials: 'ZU', color: 'color-pink',
@@ -310,14 +310,14 @@ Príklad: ak hosť pošle údaje na faktúru, napíš odpoveď hosťovi a na kon
     system: `Si Zuzana, HR Manažérka. Komunikuješ VÝHRADNE po slovensky. Si empatická a organizovaná. Nikdy nehovor že si AI.
 
 KOMUNIKÁCIA S KOLEGAMI:
-Ak potrebuješ delegovať úlohu kolegovi, použi marker na konci správy:
-##JURAJ## [údaje pre faktúru]
-##MARTINA## [úloha pre asistentku]
-##PETER## [úloha pre sales]
-##ZUZANA## [úloha pre HR]
-##LUCIA## [úloha pre marketing]
-Príklad: ak hosť pošle údaje na faktúru, napíš odpoveď hosťovi a na konci pridaj:
-##JURAJ## Meno: Jan Novak | Adresa: Hlavná 1, Bratislava | Dátumy: 1.7-3.7.2026 | Osoby: 4 | Cena: 260€ | Daň: 8€ | Záloha: 130€ do 1.6.2026`
+Ak potrebuješ delegovať úlohu kolegovi, použi JSON marker NA KONCI správy (po svojom texte):
+SEND_TO:{"to":"juraj","data":"Meno: X | Adresa: X | Dátumy: X | Osoby: X | Cena: X€ | Daň: X€ | Záloha: X€ do X"}
+SEND_TO:{"to":"peter","data":"úloha pre Petra"}
+SEND_TO:{"to":"lucia","data":"úloha pre Luciu"}
+SEND_TO:{"to":"zuzana","data":"úloha pre Zuzanu"}
+
+DÔLEŽITÉ: Keď hosť pošle svoje údaje (meno, adresa) a ty máš všetky info na faktúru, VŽDY na konci odpovede pridaj SEND_TO pre Juraja.
+Keď si vypočítala cenu a chceš skontrolovať kalendár, pridaj SEND_TO pre Martinu (seba) nie je potrebné.`
   },
   {
     id: 'lucia', name: 'Lucia', role: 'Marketing', initials: 'LU', color: 'color-blue',
@@ -325,14 +325,14 @@ Príklad: ak hosť pošle údaje na faktúru, napíš odpoveď hosťovi a na kon
     system: `Si Lucia, Marketing Manažérka. Komunikuješ VÝHRADNE po slovensky. Si kreatívna a analytická. Nikdy nehovor že si AI.
 
 KOMUNIKÁCIA S KOLEGAMI:
-Ak potrebuješ delegovať úlohu kolegovi, použi marker na konci správy:
-##JURAJ## [údaje pre faktúru]
-##MARTINA## [úloha pre asistentku]
-##PETER## [úloha pre sales]
-##ZUZANA## [úloha pre HR]
-##LUCIA## [úloha pre marketing]
-Príklad: ak hosť pošle údaje na faktúru, napíš odpoveď hosťovi a na konci pridaj:
-##JURAJ## Meno: Jan Novak | Adresa: Hlavná 1, Bratislava | Dátumy: 1.7-3.7.2026 | Osoby: 4 | Cena: 260€ | Daň: 8€ | Záloha: 130€ do 1.6.2026`
+Ak potrebuješ delegovať úlohu kolegovi, použi JSON marker NA KONCI správy (po svojom texte):
+SEND_TO:{"to":"juraj","data":"Meno: X | Adresa: X | Dátumy: X | Osoby: X | Cena: X€ | Daň: X€ | Záloha: X€ do X"}
+SEND_TO:{"to":"peter","data":"úloha pre Petra"}
+SEND_TO:{"to":"lucia","data":"úloha pre Luciu"}
+SEND_TO:{"to":"zuzana","data":"úloha pre Zuzanu"}
+
+DÔLEŽITÉ: Keď hosť pošle svoje údaje (meno, adresa) a ty máš všetky info na faktúru, VŽDY na konci odpovede pridaj SEND_TO pre Juraja.
+Keď si vypočítala cenu a chceš skontrolovať kalendár, pridaj SEND_TO pre Martinu (seba) nie je potrebné.`
   }
 ];
 
@@ -667,25 +667,24 @@ async function fetchAgentReply(agentId, msg) {
   } catch(e) { console.error('fetchAgentReply error:', e); }
 }
 
-function showAgentNotification(agentId, message) {
-  // Find seat and add badge
-  const seats = document.querySelectorAll('.seat');
-  seats.forEach(seat => {
-    if (seat.onclick && seat.onclick.toString().includes(agentId)) {
-      let badge = seat.querySelector('.notif-badge');
-      if (!badge) {
-        badge = document.createElement('div');
+function showAgentNotification(agentId) {
+  if (!state.pendingNotifs) state.pendingNotifs = {};
+  state.pendingNotifs[agentId] = true;
+  // Find seat by id attribute and add red badge
+  document.querySelectorAll('.seat').forEach(seat => {
+    const clickStr = seat.getAttribute('onclick') || (seat.onclick ? seat.onclick.toString() : '');
+    if (clickStr.includes("'" + agentId + "'") || clickStr.includes('"' + agentId + '"')) {
+      const av = seat.querySelector('.seat-avatar');
+      if (av && !av.querySelector('.notif-badge')) {
+        const badge = document.createElement('div');
         badge.className = 'notif-badge';
-        badge.style.cssText = 'position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#e84a4a;border:2px solid var(--bg);font-size:9px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;z-index:10;';
+        badge.style.cssText = 'position:absolute;top:-2px;right:-2px;width:14px;height:14px;border-radius:50%;background:#e84a4a;border:2px solid var(--bg);font-size:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;z-index:10;pointer-events:none;';
         badge.textContent = '!';
-        const av = seat.querySelector('.seat-avatar');
-        if (av) { av.style.position='relative'; av.appendChild(badge); }
+        av.style.position = 'relative';
+        av.appendChild(badge);
       }
     }
   });
-  // Also store pending message for when user opens that chat
-  if (!state.pendingNotifs) state.pendingNotifs = {};
-  state.pendingNotifs[agentId] = message;
 }
 
 function sendToAgent(fromAgentId, toAgentId, message) {
@@ -698,20 +697,29 @@ function sendToAgent(fromAgentId, toAgentId, message) {
 }
 
 function checkForAgentHandoff(reply, fromAgentId) {
-  // Check ##AGENT_ID## markers
-  const markerMatch = reply.match(/##([A-Z]+)##([^\n]*)/i);
-  if (markerMatch) {
-    const targetId = markerMatch[1].toLowerCase();
-    const data = markerMatch[2].trim();
-    const targetAgent = AGENTS.find(a => a.id === targetId);
-    if (targetAgent) {
-      const msg = `[Od ${AGENTS.find(a=>a.id===fromAgentId)?.name}]: ${data}\n\nSpracuj túto úlohu.`;
-      state.histories[targetId].push({role:'user', content:msg});
-      fetchAgentReply(targetId, msg);
-      return true;
-    }
-  }
-  return false;
+  const fromAgent = AGENTS.find(a => a.id === fromAgentId);
+  const regex = /SEND_TO:\{[^}]+\}/g;
+  const matches = reply.match(regex);
+  if (!matches) return false;
+  let found = false;
+  matches.forEach(match => {
+    try {
+      const jsonStr = match.replace('SEND_TO:', '');
+      const obj = JSON.parse(jsonStr);
+      const targetId = obj.to?.toLowerCase();
+      const data = obj.data || '';
+      const targetAgent = AGENTS.find(a => a.id === targetId);
+      if (targetAgent && data) {
+        const msg = `[Správa od ${fromAgent?.name || 'kolegu'}]:\n${data}\n\nSpracuj túto úlohu prosím.`;
+        state.histories[targetId].push({role:'user', content:msg});
+        fetchAgentReply(targetId, msg);
+        showAgentNotification(targetId);
+        found = true;
+        console.log(`Handoff: ${fromAgentId} → ${targetId}:`, data);
+      }
+    } catch(e) { console.error('Handoff parse error:', e, match); }
+  });
+  return found;
 }
 
 let busy = false;
@@ -734,17 +742,17 @@ async function sendWithContext(userText, agent) {
     const reply = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
     if (reply) {
       const hasHandoff = checkForAgentHandoff(reply, agent.id);
-      const cleanReply = reply.replace(/##[A-Z]+##[^\n]*(\n|$)/gi, '').trim();
+      const cleanReply = reply.replace(/SEND_TO:\{[^}]+\}/g, '').trim();
       if (cleanReply) {
         addBubble('agent', cleanReply, agent);
         state.histories[agent.id].push({role:'assistant', content:cleanReply});
       }
       if (hasHandoff) {
         setTimeout(() => {
-          const targetMatch = reply.match(/##([A-Z]+)##/i);
-          if (targetMatch) {
-            const targetAgent = AGENTS.find(a=>a.id===targetMatch[1].toLowerCase());
-            if (targetAgent) addBubble('agent', `✓ Preposlala som úlohu kolegovi ${targetAgent.name}. Otvor jeho chat pre výsledok.`, agent);
+          const sendMatch = reply.match(/SEND_TO:\{"to":"([^"]+)"/);
+          if (sendMatch) {
+            const targetAgent = AGENTS.find(a=>a.id===sendMatch[1]);
+            if (targetAgent) addBubble('agent', `Preposlala som úlohu kolegovi ${targetAgent.name}. Otvor jeho chat pre výsledok.`, agent);
           }
         }, 400);
       }

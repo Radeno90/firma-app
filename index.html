@@ -796,132 +796,169 @@ function extractFakturaFromText(text, history) {
 }
 
 function generatePDF(data) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
-  const W = 210, ml = 15, mr = 195;
-
-  // Header
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(18);
-  doc.text('FAKTÚRA č.: ' + data.cislo, mr, 25, {align:'right'});
-  doc.setFontSize(10);
-  doc.text('Variabilný symbol: ' + data.cislo, mr, 31, {align:'right'});
-
-  // Supplier
-  doc.setFontSize(11);
-  doc.setFont('helvetica','bold');
-  doc.text('TRIMEX DOMY, s.r.o.', ml, 25);
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(9);
-  doc.text('Benkova 1263/2', ml, 31);
-  doc.text('91501 Nové Mesto nad Váhom', ml, 36);
-  doc.text('Prevádzka: Valčianska dolina', ml, 41);
-  doc.text('Tel: +421 907 647 718', ml, 46);
-  doc.text('IČO: 50608550', ml, 52);
-  doc.text('DIČ: 2120397851', ml, 57);
-
-  // Bank
-  doc.text('Peňažný ústav: Fio banka', ml, 63);
-  doc.text('IBAN: SK48 8330 0000 0024 0205 3200', ml, 68);
-  doc.text('Účet: 2402053200 / 8330', ml, 73);
-  doc.text('SWIFT: FIOZSKBAXXX', ml, 78);
-
-  // Divider
-  doc.setDrawColor(180);
-  doc.line(ml, 83, mr, 83);
-
-  // Dates
-  doc.setFontSize(9);
-  doc.text('Dátum vyhotovenia: ' + data.datum, ml, 89);
-  doc.text('Dátum splatnosti: ' + data.splatnost, ml, 94);
-  doc.text('Dátum dodania: ' + data.datum, ml, 99);
-
-  // Recipient
-  const cx = 110;
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(10);
-  doc.text('Odberateľ:', cx, 89);
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(10);
-  doc.text(data.odberatel.meno, cx, 95);
-  doc.text(data.odberatel.adresa, cx, 101);
-  doc.text(data.odberatel.mesto, cx, 107);
-  if (data.odberatel.ico) doc.text('IČO: ' + data.odberatel.ico, cx, 113);
-
-  // Table header
-  doc.setDrawColor(180);
-  doc.line(ml, 112, mr, 112);
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(9);
-  doc.text('Popis', ml, 118);
-  doc.text('MJ', 120, 118);
-  doc.text('Počet', 135, 118);
-  doc.text('Cena MJ', 155, 118);
-  doc.text('Celkom', 180, 118, {align:'right'});
-  doc.line(ml, 120, mr, 120);
-
-  // Row 1 - accommodation
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(8);
-  const pobytLines = doc.splitTextToSize(data.pobyt.popis, 100);
-  doc.text(pobytLines, ml, 126);
-  doc.text('ks', 120, 126);
-  doc.text('1,000', 135, 126);
-  doc.text(data.pobyt.suma.toFixed(2), 155, 126);
-  doc.text(data.pobyt.suma.toFixed(2), 180, 126, {align:'right'});
-
-  // Row 2 - tax
-  const taxY = 126 + pobytLines.length * 4 + 4;
-  doc.text('daň z ubytovania obec Valča', ml, taxY);
-  doc.text('ks', 120, taxY);
-  doc.text(String(data.dan.pocet), 135, taxY);
-  doc.text('1,00', 155, taxY);
-  doc.text(data.dan.suma.toFixed(2), 180, taxY, {align:'right'});
-
-  // Row 3 - sauna (optional)
-  let saunaOffset = 0;
-  if (data.sauna && data.sauna > 0) {
-    saunaOffset = 8;
-    const saunaY = taxY + saunaOffset;
-    doc.text('vonkajšia sauna', ml, saunaY);
-    doc.text('ks', 120, saunaY);
-    doc.text('1', 135, saunaY);
-    doc.text(data.sauna.toFixed(2), 155, saunaY);
-    doc.text(data.sauna.toFixed(2), 180, saunaY, {align:'right'});
+  const html = `<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; padding: 15mm 15mm 10mm 15mm; }
+  .page { max-width: 180mm; margin: 0 auto; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6mm; }
+  .supplier { font-size: 9pt; line-height: 1.5; }
+  .supplier .name { font-size: 12pt; font-weight: bold; margin-bottom: 2mm; }
+  .faktura-title { text-align: right; }
+  .faktura-title h1 { font-size: 18pt; font-weight: bold; letter-spacing: 1px; margin-bottom: 1mm; }
+  .faktura-title .vs { font-size: 9pt; }
+  hr { border: none; border-top: 1px solid #999; margin: 3mm 0; }
+  .meta-row { display: flex; justify-content: space-between; margin-bottom: 5mm; }
+  .meta-left { font-size: 9pt; line-height: 1.7; }
+  .meta-right { font-size: 10pt; }
+  .meta-right .label { font-weight: bold; margin-bottom: 1mm; }
+  .meta-right .value { font-size: 10pt; line-height: 1.6; }
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0; font-size: 9pt; }
+  table thead tr { border-top: 1px solid #999; border-bottom: 1px solid #999; }
+  table th { padding: 2mm 1mm; text-align: left; font-weight: bold; }
+  table th:last-child, table td:last-child { text-align: right; }
+  table th:nth-child(2), table td:nth-child(2) { text-align: center; }
+  table th:nth-child(3), table td:nth-child(3) { text-align: center; }
+  table th:nth-child(4), table td:nth-child(4) { text-align: right; }
+  table td { padding: 2mm 1mm; border-bottom: 1px solid #eee; vertical-align: top; }
+  .totals { display: flex; justify-content: flex-end; margin-top: 3mm; }
+  .totals-box { width: 70mm; font-size: 9pt; }
+  .totals-row { display: flex; justify-content: space-between; padding: 1mm 0; }
+  .uhradit { border: 1.5px solid #000; padding: 2mm 3mm; display: flex; justify-content: space-between; font-size: 11pt; font-weight: bold; margin-top: 1mm; }
+  .footer { margin-top: 5mm; font-size: 8.5pt; line-height: 1.7; }
+  .footer-row { display: flex; justify-content: space-between; margin-top: 3mm; }
+  @media print {
+    body { padding: 0; }
+    @page { margin: 15mm 15mm 10mm 15mm; size: A4; }
   }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="supplier">
+      <div class="name">TRIMEX DOMY, s.r.o.</div>
+      Benkova 1263/2<br>
+      91501 Nové Mesto nad Váhom<br>
+      Prevádzka: Valčianska dolina<br>
+      Tel: +421 907 647 718<br><br>
+      Peňažný ústav: Fio banka<br>
+      IBAN: SK48 8330 0000 0024 0205 3200<br>
+      Účet / kód: 2402053200 / 8330<br>
+      SWIFT: FIOZSKBAXXX
+    </div>
+    <div class="faktura-title">
+      <h1>FAKTÚRA č.: ${data.cislo}</h1>
+      <div class="vs">Variabilný symbol: ${data.cislo}</div>
+    </div>
+  </div>
 
-  // Totals
-  const totY = taxY + saunaOffset + 12;
-  doc.line(ml, totY - 4, mr, totY - 4);
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(10);
-  doc.text('Celkom bez DPH:', 140, totY);
-  doc.text(data.celkom.toFixed(2) + ' EUR', 180, totY, {align:'right'});
-  doc.text('Celkom:', 140, totY + 7);
-  doc.text(data.celkom.toFixed(2) + ' EUR', 180, totY + 7, {align:'right'});
-  doc.setDrawColor(100);
-  doc.setLineWidth(0.5);
-  doc.rect(130, totY + 10, 65, 9);
-  doc.setFontSize(11);
-  doc.text('Uhradiť:', 140, totY + 17);
-  doc.text(data.celkom.toFixed(2) + ' EUR', 180, totY + 17, {align:'right'});
-  doc.setLineWidth(0.2);
+  <div style="display:flex;justify-content:space-between;font-size:9pt;margin-bottom:4mm;">
+    <div>
+      IČO: 50608550<br>
+      DIČ: 2120397851
+    </div>
+    <div style="text-align:right">
+      Dátum vyhotovenia: ${data.datum}<br>
+      Dátum splatnosti: ${data.splatnost}<br>
+      Dátum dodania: ${data.datum}
+    </div>
+  </div>
 
-  // Footnote
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(8);
-  doc.text('záloha 50% ' + data.zaloha.toFixed(2) + ' EUR splatná ' + data.zaloha_datum, ml, totY + 28);
-  doc.text('Faktúra je vyhotovená elektronicky a je platná aj bez podpisu.', ml, totY + 34);
-  doc.text('www.panoramahome.sk', ml, totY + 40);
-  doc.text('Vystavil: Radovan Vojvoda', mr, totY + 40, {align:'right'});
+  <hr>
 
-  // Footer line
-  doc.setDrawColor(180);
-  doc.line(ml, totY + 44, mr, totY + 44);
+  <div class="meta-row">
+    <div class="meta-left">
+      Objednávka č.:<br>
+      Dodací list č.: ${data.cislo}<br>
+      Spôsob dopravy:<br>
+      Forma úhrady:
+    </div>
+    <div class="meta-right">
+      <div class="label">Odberateľ:</div>
+      <div class="value">
+        ${data.odberatel.meno}<br>
+        ${data.odberatel.adresa}<br>
+        ${data.odberatel.mesto}<br>
+        ${data.odberatel.ico ? 'IČO: ' + data.odberatel.ico : ''}
+      </div>
+    </div>
+  </div>
 
-  doc.save('faktura-' + data.cislo + '.pdf');
+  <hr>
+  <p style="font-size:9pt;font-weight:bold;margin-bottom:2mm;">Fakturujeme Vám</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:45%">Popis</th>
+        <th style="width:8%">MJ</th>
+        <th style="width:12%">Počet MJ</th>
+        <th style="width:15%">Cena MJ bez DPH</th>
+        <th style="width:8%">%DPH</th>
+        <th style="width:12%">Celkom bez DPH</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${data.pobyt.popis}</td>
+        <td style="text-align:center"></td>
+        <td style="text-align:center">1,000</td>
+        <td style="text-align:right">${data.pobyt.suma.toFixed(2)}</td>
+        <td style="text-align:center"></td>
+        <td style="text-align:right">${data.pobyt.suma.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td>daň z ubytovania obec Valča</td>
+        <td style="text-align:center"></td>
+        <td style="text-align:center">${data.dan.pocet},000</td>
+        <td style="text-align:right">1,00</td>
+        <td style="text-align:center"></td>
+        <td style="text-align:right">${data.dan.suma.toFixed(2)}</td>
+      </tr>
+      ${data.sauna > 0 ? `<tr>
+        <td>vonkajšia sauna</td>
+        <td style="text-align:center"></td>
+        <td style="text-align:center">1,000</td>
+        <td style="text-align:right">${data.sauna.toFixed(2)}</td>
+        <td style="text-align:center"></td>
+        <td style="text-align:right">${data.sauna.toFixed(2)}</td>
+      </tr>` : ''}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-box">
+      <div class="totals-row"><span>Celkom bez DPH:</span><span>${data.celkom.toFixed(2)} EUR</span></div>
+      <div class="totals-row"><span>Celkom:</span><span>${data.celkom.toFixed(2)} EUR</span></div>
+      <div class="uhradit"><span>Uhradiť:</span><span>${data.celkom.toFixed(2)} EUR</span></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    záloha 50% ${data.zaloha.toFixed(2)} EUR splatná ${data.zaloha_datum}<br>
+    Faktúra je vyhotovená elektronicky a je platná aj bez podpisu.<br>
+    www.panoramahome.sk
+    <div class="footer-row">
+      <div></div>
+      <div>Vystavil: Radovan Vojvoda</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 500);
   return true;
 }
+
 
 function tryParseFakturaJSON(reply) {
   // Try FAKTURA_JSON: marker - find the JSON object after it

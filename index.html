@@ -565,6 +565,20 @@ function openChat(agentId) {
   if (state.pendingNotifs?.[agentId]) delete state.pendingNotifs[agentId];
   showScreen('chat');
   setTimeout(()=>{ document.getElementById('messages').scrollTop=99999; },50);
+  // Check history for unrendered FAKTURA_JSON
+  if (agentId === 'juraj') {
+    setTimeout(() => {
+      const hasPdfBtn = document.querySelector('.pdf-btn');
+      if (!hasPdfBtn) {
+        for (const msg of state.histories['juraj']) {
+          if (msg.role === 'assistant' && msg.content.includes('FAKTURA_JSON:')) {
+            const data = tryParseFakturaJSON(msg.content);
+            if (data) { addPDFButton(data); break; }
+          }
+        }
+      }
+    }, 100);
+  }
 }
 
 async function quickAction(type) {
